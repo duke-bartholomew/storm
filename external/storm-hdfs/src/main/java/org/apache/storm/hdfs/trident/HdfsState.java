@@ -202,11 +202,11 @@ public class HdfsState implements State {
                     }
                 }
                 if (!rotated) {
-                    if (this.out instanceof HdfsDataOutputStream) {
-                        ((HdfsDataOutputStream) this.out).hsync(EnumSet.of(HdfsDataOutputStream.SyncFlag.UPDATE_LENGTH));
-                    } else {
+                    //if (this.out instanceof HdfsDataOutputStream) {
+                    //    ((HdfsDataOutputStream) this.out).hsync(EnumSet.of(HdfsDataOutputStream.SyncFlag.UPDATE_LENGTH));
+                    //} else {
                         this.out.hsync();
-                    }
+                    //}
                 }
             }
         }

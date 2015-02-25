@@ -130,10 +130,27 @@ public abstract class AbstractHdfsBolt extends BaseRichBolt {
     public void declareOutputFields(OutputFieldsDeclarer outputFieldsDeclarer) {
     }
 
-    abstract void closeOutputFile() throws IOException;
+    public void cleanup() {
+        if(this.rotationTimer != null) {
+            this.rotationTimer.cancel();
+        }
 
-    abstract Path createOutputFile() throws IOException;
+        try {
+            synchronized (this.writeLock) {
+                closeOutputFile();
+                for (RotationAction action : this.rotationActions) {
+                    action.execute(this.fs, this.currentFile);
+                }
+            }
+        } catch (IOException var6) {
+            LOG.warn("Error while cleaning up bolt", var6);
+        }
+    }
 
-    abstract void doPrepare(Map conf, TopologyContext topologyContext, OutputCollector collector) throws IOException;
+    protected abstract void closeOutputFile() throws IOException;
+
+    protected abstract Path createOutputFile() throws IOException;
+
+    protected abstract void doPrepare(Map conf, TopologyContext topologyContext, OutputCollector collector) throws IOException;
 
 }

@@ -95,7 +95,7 @@ public class SequenceFileBolt extends AbstractHdfsBolt {
     }
 
     @Override
-    public void doPrepare(Map conf, TopologyContext topologyContext, OutputCollector collector) throws IOException {
+    protected void doPrepare(Map conf, TopologyContext topologyContext, OutputCollector collector) throws IOException {
         LOG.info("Preparing Sequence File Bolt...");
         if (this.format == null) throw new IllegalStateException("SequenceFormat must be specified.");
 
@@ -129,7 +129,7 @@ public class SequenceFileBolt extends AbstractHdfsBolt {
 
     }
 
-    Path createOutputFile() throws IOException {
+    protected Path createOutputFile() throws IOException {
         Path p = new Path(this.fsUrl + this.fileNameFormat.getPath(), this.fileNameFormat.getName(this.rotation, System.currentTimeMillis()));
         this.writer = SequenceFile.createWriter(
                 this.hdfsConfig,
@@ -141,7 +141,7 @@ public class SequenceFileBolt extends AbstractHdfsBolt {
         return p;
     }
 
-    void closeOutputFile() throws IOException {
+    protected void closeOutputFile() throws IOException {
         this.writer.close();
     }
 

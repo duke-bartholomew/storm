@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-import org.apache.hadoop.hdfs.client.HdfsDataOutputStream.SyncFlag;
+//import org.apache.hadoop.hdfs.client.HdfsDataOutputStream.SyncFlag;
 import org.apache.storm.hdfs.bolt.format.FileNameFormat;
 import org.apache.storm.hdfs.bolt.format.RecordFormat;
 import org.apache.storm.hdfs.bolt.rotation.FileRotationPolicy;
@@ -81,49 +81,65 @@ public class HdfsBolt extends AbstractHdfsBolt{
     }
 
     @Override
-    public void doPrepare(Map conf, TopologyContext topologyContext, OutputCollector collector) throws IOException {
-        LOG.info("Preparing HDFS Bolt...");
+    protected void doPrepare(Map conf, TopologyContext topologyContext, OutputCollector collector) throws IOException {
+        LOG.info("Preparing HDFS Bolt for: {}", this.fsUrl);
         this.fs = FileSystem.get(URI.create(this.fsUrl), hdfsConfig);
     }
 
     @Override
     public void execute(Tuple tuple) {
         try {
-            byte[] bytes = this.format.format(tuple);
-            synchronized (this.writeLock) {
-                out.write(bytes);
-                this.offset += bytes.length;
-
-                if (this.syncPolicy.mark(tuple, this.offset)) {
-                    if (this.out instanceof HdfsDataOutputStream) {
-                        ((HdfsDataOutputStream) this.out).hsync(EnumSet.of(SyncFlag.UPDATE_LENGTH));
-                    } else {
-                        this.out.hsync();
-                    }
-                    this.syncPolicy.reset();
-                }
-            }
-
+            process(tuple);
             this.collector.ack(tuple);
-
-            if(this.rotationPolicy.mark(tuple, this.offset)){
-                rotateOutputFile(); // synchronized
-                this.offset = 0;
-                this.rotationPolicy.reset();
-            }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             LOG.warn("write/sync failed.", e);
             this.collector.fail(tuple);
         }
     }
 
+    public void process(Tuple tuple) throws IOException {
+        if(this.out == null) {
+            throw new IOException("FileDescriptor not initialized!");
+        }
+
+        byte[] bytes = this.format.format(tuple);
+        synchronized (this.writeLock) {
+            out.write(bytes);
+            this.offset += bytes.length;
+
+            if (this.syncPolicy.mark(tuple, this.offset)) {
+                //if (this.out instanceof HdfsDataOutputStream) {
+                //    ((HdfsDataOutputStream) this.out).hsync(EnumSet.of(SyncFlag.UPDATE_LENGTH));
+                //} else {
+                    this.out.hsync();
+                //}
+                this.syncPolicy.reset();
+            }
+        }
+
+        if(this.rotationPolicy.mark(tuple, this.offset)){
+            rotateOutputFile(); // synchronized
+            this.offset = 0;
+            this.rotationPolicy.reset();
+        }
+    }
+
     @Override
-    void closeOutputFile() throws IOException {
+    protected void closeOutputFile() throws IOException {
+        if(this.out == null) {
+            throw new IOException("FileDescriptor not initialized!");
+        }
+
         this.out.close();
     }
 
     @Override
-    Path createOutputFile() throws IOException {
+    protected Path createOutputFile() throws IOException {
+        if(fs == null) {
+            throw new IOException("FileDescriptor not initialized!");
+        }
+
         Path path = new Path(this.fileNameFormat.getPath(), this.fileNameFormat.getName(this.rotation, System.currentTimeMillis()));
         this.out = this.fs.create(path);
         return path;
